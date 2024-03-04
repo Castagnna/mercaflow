@@ -1,13 +1,16 @@
 from datetime import datetime
 from airflow import DAG
 from airflow.models import Variable
-
-# from airflow.utils.task_group import TaskGroup
+from airflow.utils.task_group import TaskGroup
 from airflow.providers.google.cloud.operators.dataproc import (
     DataprocSubmitPySparkJobOperator,
     DataprocCreateClusterOperator,
     DataprocDeleteClusterOperator,
     ClusterGenerator,
+)
+from airflow.providers.google.cloud.operators.bigquery import (
+    BigQueryCreateExternalTableOperator,
+    BigQueryDeleteTableOperator,
 )
 
 
@@ -77,7 +80,7 @@ with dag:
             "--mode",
             "cluster",
             "--datetime",
-            prev_execution_date, # passa como arg o dia 1 do mês anterior, que já está fechado
+            prev_execution_date,  # passa como arg o dia 1 do mês anterior, que já está fechado
         ],
         cluster_name="mainflow",
         region="southamerica-east1",
@@ -197,43 +200,99 @@ with dag:
         region="southamerica-east1",
     )
 
-    gold_metrica_vendas = DataprocSubmitPySparkJobOperator(
-        task_id="gold_metrica_vendas",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
-        arguments=[
-            "gold",
-            "MetricaVendas",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-        ],
-        cluster_name="mainflow",
-        region="southamerica-east1",
-    )
+    with TaskGroup(group_id="gold_metrica_vendas") as gold_metrica_vendas:
 
-    gold_upsell_categorias = DataprocSubmitPySparkJobOperator(
-        task_id="gold_upsell_categorias",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
-        arguments=[
-            "gold",
-            "UpSellCategoria",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-        ],
-        cluster_name="mainflow",
-        region="southamerica-east1",
-    )
+        gold_metrica_vendas = DataprocSubmitPySparkJobOperator(
+            task_id="gold_metrica_vendas",
+            main="gs://mercafacil/eggs/launcher.py",
+            pyfiles=[
+                "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
+                "gs://mercafacil/eggs/launcher.py",
+            ],
+            arguments=[
+                "gold",
+                "MetricaVendas",
+                "--env",
+                env,
+                "--mode",
+                "cluster",
+            ],
+            cluster_name="mainflow",
+            region="southamerica-east1",
+        )
+
+        drop_gold_metrica_vendas = BigQueryDeleteTableOperator(
+            task_id="drop_gold_metrica_vendas",
+            deletion_dataset_table="mercadata.gold.metrica_vendas",
+            ignore_if_missing=True,
+        )
+
+        create_gold_metrica_vendas = BigQueryCreateExternalTableOperator(
+            task_id="create_gold_metrica_vendas",
+            table_resource={
+                "tableReference": {
+                    "projectId": "mercadata",
+                    "datasetId": "gold",
+                    "tableId": "metrica_vendas",
+                },
+                "externalDataConfiguration": {
+                    "sourceFormat": "PARQUET",
+                    "sourceUris": [
+                        "gs://mercafacil/data/prd/gold/metricas_de_vendas_por_produto"
+                    ],
+                    "autodetect": True,
+                },
+            },
+        )
+
+        [gold_metrica_vendas >> drop_gold_metrica_vendas >> create_gold_metrica_vendas]
+
+    with TaskGroup(group_id="gold_upsell_categorias") as gold_upsell_categorias:
+
+        gold_upsell_categorias = DataprocSubmitPySparkJobOperator(
+            task_id="gold_upsell_categorias",
+            main="gs://mercafacil/eggs/launcher.py",
+            pyfiles=[
+                "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
+                "gs://mercafacil/eggs/launcher.py",
+            ],
+            arguments=[
+                "gold",
+                "UpSellCategoria",
+                "--env",
+                env,
+                "--mode",
+                "cluster",
+            ],
+            cluster_name="mainflow",
+            region="southamerica-east1",
+        )
+
+        drop_gold_upsell_categorias = BigQueryDeleteTableOperator(
+            task_id="drop_gold_upsell_categorias",
+            deletion_dataset_table="mercadata.gold.upsell_categorias",
+            ignore_if_missing=True,
+        )
+
+        create_gold_upsell_categorias = BigQueryCreateExternalTableOperator(
+            task_id="create_gold_upsell_categorias",
+            table_resource={
+                "tableReference": {
+                    "projectId": "mercadata",
+                    "datasetId": "gold",
+                    "tableId": "upsell_categorias",
+                },
+                "externalDataConfiguration": {
+                    "sourceFormat": "PARQUET",
+                    "sourceUris": [
+                        "gs://mercafacil/data/prd/gold/top_5_produtos_para_o_cliente"
+                    ],
+                    "autodetect": True,
+                },
+            },
+        )
+
+        [gold_upsell_categorias >> drop_gold_upsell_categorias >> create_gold_upsell_categorias]
 
     delete_cluster = DataprocDeleteClusterOperator(
         task_id="delete_cluster",
