@@ -12,6 +12,7 @@ from airflow.providers.google.cloud.operators.bigquery import (
     BigQueryCreateExternalTableOperator,
     BigQueryDeleteTableOperator,
 )
+from airflow.providers.slack.notifications.slack import send_slack_notification
 
 
 DAG_NAME = "MainFlow"
@@ -34,6 +35,13 @@ dag = DAG(
     max_active_runs=1,
     catchup=False,
     default_args=DEFAULT_ARGS,
+    on_failure_callback=[
+        send_slack_notification(
+            text="The DAG {{ dag.dag_id }} failed",
+            channel="#dados",
+            username="Airflow",
+        )
+    ],
     tags=["dataproc"],
 )
 
@@ -292,7 +300,11 @@ with dag:
             },
         )
 
-        [gold_upsell_categorias >> drop_gold_upsell_categorias >> create_gold_upsell_categorias]
+        [
+            gold_upsell_categorias
+            >> drop_gold_upsell_categorias
+            >> create_gold_upsell_categorias
+        ]
 
     delete_cluster = DataprocDeleteClusterOperator(
         task_id="delete_cluster",
