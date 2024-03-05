@@ -1,0 +1,5 @@
+REGION = "southamerica-east1"
+ZONE = "southamerica-east1-a"
+PROJECT_ID = "mercadata"
+MAIN_PATH = "gs://mercafacil/eggs/launcher.py"
+EGG_PATH = "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg"

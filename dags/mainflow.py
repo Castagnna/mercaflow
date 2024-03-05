@@ -3,16 +3,15 @@ from airflow import DAG
 from airflow.models import Variable
 from airflow.utils.task_group import TaskGroup
 from airflow.providers.google.cloud.operators.dataproc import (
-    DataprocSubmitPySparkJobOperator,
-    DataprocCreateClusterOperator,
     DataprocDeleteClusterOperator,
-    ClusterGenerator,
 )
 from airflow.providers.google.cloud.operators.bigquery import (
     BigQueryCreateExternalTableOperator,
     BigQueryDeleteTableOperator,
 )
 from airflow.providers.slack.notifications.slack import send_slack_notification
+from operators.dataproc.create import CreateClusterOperator
+from operators.dataproc.submit import SubmitPySparkJobOperator
 
 
 DAG_NAME = "MainFlow"
@@ -49,37 +48,18 @@ env = Variable.get("environment")
 
 with dag:
 
-    create_cluster = DataprocCreateClusterOperator(
+    create_cluster = CreateClusterOperator(
         task_id="create_cluster",
         cluster_name="mainflow",
-        region="southamerica-east1",
-        project_id="mercadata",
-        cluster_config=ClusterGenerator(
-            project_id="mercadata",
-            zone="southamerica-east1-a",
-            master_machine_type="n2-highmem-8",
-            worker_machine_type="n2-highmem-8",
-            num_workers=4,
-            init_actions_uris=[
-                "gs://goog-dataproc-initialization-actions-us-central1/python/pip-install.sh"
-            ],
-            subnetwork_uri=Variable.get("subnetwork"),
-            internal_ip_only=True,
-            service_account=Variable.get("service_account"),
-            image_version="2.0",
-            enable_component_gateway=True,
-        ).make(),
+        master_machine_type="n2-highmem-8",
+        worker_machine_type="n2-highmem-8",
+        num_workers=4,
     )
 
     prev_execution_date = "{{ prev_execution_date.strftime('%Y%m%d-%H%M%S') }}"
 
-    bronze_vendas = DataprocSubmitPySparkJobOperator(
+    bronze_vendas = SubmitPySparkJobOperator(
         task_id="bronze_vendas",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
         arguments=[
             "bronze",
             "Vendas",
@@ -91,16 +71,10 @@ with dag:
             prev_execution_date,  # passa como arg o dia 1 do mês anterior, que já está fechado
         ],
         cluster_name="mainflow",
-        region="southamerica-east1",
     )
 
-    bronze_categorias = DataprocSubmitPySparkJobOperator(
+    bronze_categorias = SubmitPySparkJobOperator(
         task_id="bronze_categorias",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
         arguments=[
             "bronze",
             "Categorias",
@@ -110,16 +84,10 @@ with dag:
             "cluster",
         ],
         cluster_name="mainflow",
-        region="southamerica-east1",
     )
 
-    bronze_clientes = DataprocSubmitPySparkJobOperator(
+    bronze_clientes = SubmitPySparkJobOperator(
         task_id="bronze_clientes",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
         arguments=[
             "bronze",
             "Clientes",
@@ -129,16 +97,10 @@ with dag:
             "cluster",
         ],
         cluster_name="mainflow",
-        region="southamerica-east1",
     )
 
-    bronze_produtos = DataprocSubmitPySparkJobOperator(
+    bronze_produtos = SubmitPySparkJobOperator(
         task_id="bronze_produtos",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
         arguments=[
             "bronze",
             "Produtos",
@@ -148,16 +110,10 @@ with dag:
             "cluster",
         ],
         cluster_name="mainflow",
-        region="southamerica-east1",
     )
 
-    silver_deduplica_vendas = DataprocSubmitPySparkJobOperator(
+    silver_deduplica_vendas = SubmitPySparkJobOperator(
         task_id="silver_deduplica_vendas",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
         arguments=[
             "silver",
             "DeduplicaVendas",
@@ -167,16 +123,10 @@ with dag:
             "cluster",
         ],
         cluster_name="mainflow",
-        region="southamerica-east1",
     )
 
-    silver_produtos_por_cliente = DataprocSubmitPySparkJobOperator(
+    silver_produtos_por_cliente = SubmitPySparkJobOperator(
         task_id="silver_produtos_por_cliente",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
         arguments=[
             "silver",
             "ProdutosPorCliente",
@@ -186,16 +136,10 @@ with dag:
             "cluster",
         ],
         cluster_name="mainflow",
-        region="southamerica-east1",
     )
 
-    silver_vendas_por_produto = DataprocSubmitPySparkJobOperator(
+    silver_vendas_por_produto = SubmitPySparkJobOperator(
         task_id="silver_vendas_por_produto",
-        main="gs://mercafacil/eggs/launcher.py",
-        pyfiles=[
-            "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-            "gs://mercafacil/eggs/launcher.py",
-        ],
         arguments=[
             "silver",
             "VendasPorProduto",
@@ -205,18 +149,12 @@ with dag:
             "cluster",
         ],
         cluster_name="mainflow",
-        region="southamerica-east1",
     )
 
     with TaskGroup(group_id="gold_metrica_vendas") as gold_metrica_vendas:
 
-        gold_metrica_vendas = DataprocSubmitPySparkJobOperator(
+        gold_metrica_vendas = SubmitPySparkJobOperator(
             task_id="gold_metrica_vendas",
-            main="gs://mercafacil/eggs/launcher.py",
-            pyfiles=[
-                "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-                "gs://mercafacil/eggs/launcher.py",
-            ],
             arguments=[
                 "gold",
                 "MetricaVendas",
@@ -226,7 +164,6 @@ with dag:
                 "cluster",
             ],
             cluster_name="mainflow",
-            region="southamerica-east1",
         )
 
         drop_gold_metrica_vendas = BigQueryDeleteTableOperator(
@@ -257,13 +194,8 @@ with dag:
 
     with TaskGroup(group_id="gold_upsell_categorias") as gold_upsell_categorias:
 
-        gold_upsell_categorias = DataprocSubmitPySparkJobOperator(
+        gold_upsell_categorias = SubmitPySparkJobOperator(
             task_id="gold_upsell_categorias",
-            main="gs://mercafacil/eggs/launcher.py",
-            pyfiles=[
-                "gs://mercafacil/eggs/mercadata-0.0.1-py3.9.egg",
-                "gs://mercafacil/eggs/launcher.py",
-            ],
             arguments=[
                 "gold",
                 "UpSellCategoria",
@@ -273,7 +205,6 @@ with dag:
                 "cluster",
             ],
             cluster_name="mainflow",
-            region="southamerica-east1",
         )
 
         drop_gold_upsell_categorias = BigQueryDeleteTableOperator(
