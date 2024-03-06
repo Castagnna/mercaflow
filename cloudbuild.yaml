@@ -1,0 +1,12 @@
+steps:
+- id: 'Deploy Application'
+  name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: 'bash'
+  args:
+    - '-c'
+    - |
+      chmod -R 777 ./
+      ./deploy.sh -e ${_GCP_ENVIRONMENT}
+substitutions:
+  _GCP_ENVIRONMENT: dev
+timeout: 86400s
