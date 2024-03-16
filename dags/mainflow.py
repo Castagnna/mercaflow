@@ -59,111 +59,70 @@ with dag:
     prev_execution_date = "{{ prev_execution_date.strftime('%Y%m%d-%H%M%S') }}"
 
     bronze_vendas = SubmitPySparkJobOperator(
-        task_id="bronze_vendas",
-        arguments=[
-            "bronze",
-            "Vendas",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-            "--datetime",
-            prev_execution_date,  # passa como arg o dia 1 do mês anterior, que já está fechado
-        ],
-        cluster_name="mainflow",
+        "bronze_vendas",
+        "mainflow",
+        "bronze",
+        "Vendas",
+        env,
+        dttm=prev_execution_date,  # passa como arg o dia 1 do mês anterior, que já está fechado
     )
 
     bronze_categorias = SubmitPySparkJobOperator(
-        task_id="bronze_categorias",
-        arguments=[
-            "bronze",
-            "Categorias",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-        ],
-        cluster_name="mainflow",
+        "bronze_categorias",
+        "mainflow",
+        "bronze",
+        "Categorias",
+        env,
     )
 
     bronze_clientes = SubmitPySparkJobOperator(
-        task_id="bronze_clientes",
-        arguments=[
-            "bronze",
-            "Clientes",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-        ],
-        cluster_name="mainflow",
+        "bronze_clientes",
+        "mainflow",
+        "bronze",
+        "Clientes",
+        env,
     )
 
     bronze_produtos = SubmitPySparkJobOperator(
-        task_id="bronze_produtos",
-        arguments=[
-            "bronze",
-            "Produtos",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-        ],
-        cluster_name="mainflow",
+        "bronze_produtos",
+        "mainflow",
+        "bronze",
+        "Produtos",
+        env,
     )
 
     silver_deduplica_vendas = SubmitPySparkJobOperator(
-        task_id="silver_deduplica_vendas",
-        arguments=[
-            "silver",
-            "DeduplicaVendas",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-        ],
-        cluster_name="mainflow",
+        "silver_deduplica_vendas",
+        "mainflow",
+        "silver",
+        "DeduplicaVendas",
+        env,
     )
 
     silver_produtos_por_cliente = SubmitPySparkJobOperator(
-        task_id="silver_produtos_por_cliente",
-        arguments=[
-            "silver",
-            "ProdutosPorCliente",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-        ],
-        cluster_name="mainflow",
+        "silver_produtos_por_cliente",
+        "mainflow",
+        "silver",
+        "ProdutosPorCliente",
+        env,
     )
 
     silver_vendas_por_produto = SubmitPySparkJobOperator(
-        task_id="silver_vendas_por_produto",
-        arguments=[
-            "silver",
-            "VendasPorProduto",
-            "--env",
-            env,
-            "--mode",
-            "cluster",
-        ],
-        cluster_name="mainflow",
+        "silver_vendas_por_produto",
+        "mainflow",
+        "silver",
+        "VendasPorProduto",
+        env,
     )
 
     with TaskGroup(group_id="gold_metrica_vendas") as gold_metrica_vendas:
 
         gold_metrica_vendas = SubmitPySparkJobOperator(
-            task_id="gold_metrica_vendas",
-            arguments=[
-                "gold",
-                "MetricaVendas",
-                "--env",
-                env,
-                "--mode",
-                "cluster",
-            ],
-            cluster_name="mainflow",
+            "gold_metrica_vendas",
+            "mainflow",
+            "gold",
+            "MetricaVendas",
+            env,
         )
 
         drop_gold_metrica_vendas = BigQueryDeleteTableOperator(
@@ -195,16 +154,11 @@ with dag:
     with TaskGroup(group_id="gold_upsell_categorias") as gold_upsell_categorias:
 
         gold_upsell_categorias = SubmitPySparkJobOperator(
-            task_id="gold_upsell_categorias",
-            arguments=[
-                "gold",
-                "UpSellCategoria",
-                "--env",
-                env,
-                "--mode",
-                "cluster",
-            ],
-            cluster_name="mainflow",
+            "gold_upsell_categorias",
+            "mainflow",
+            "gold",
+            "UpSellCategoria",
+            env,
         )
 
         drop_gold_upsell_categorias = BigQueryDeleteTableOperator(
